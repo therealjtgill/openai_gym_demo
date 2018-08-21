@@ -3,16 +3,13 @@ import numpy as np
 
 class ObsTransformer(object):
 
-  def __init__(self, env):
+  def __init__(self, env, num_bins):
 
-    NUM_BINS = 10
     INF_CAP = 2
-    LEARNING_RATE = 0.001
-    DISCOUNT = 0.9
-    GREEDY_VAL = 0.2
 
     self.env = env
     self.obs_size = np.squeeze(env.observation_space.shape)
+    self.num_bins = num_bins
     obs_max = env.observation_space.high
     obs_min = env.observation_space.low
     #obs_max_capped = np.asarray([INF_CAP if h > INF_CAP else h for h in state_high])
@@ -21,50 +18,50 @@ class ObsTransformer(object):
     obs_min_capped = np.asarray([-2.4, -2, -0.4, -3.5])
     self.obs_max = obs_max_capped
     self.obs_min = obs_min_capped
-    self.bins = [np.linspace(l, h, NUM_BINS) for l, h in zip(state_low_capped, state_high_capped)]
+    self.bins = [np.linspace(l, h, num_bins) for l, h in zip(obs_min_capped, obs_max_capped)]
 
-def obs_to_bin(obs, obs_min, obs_max, obs_size, bins):
-  obs_capped = np.maximum(np.minimum(obs, obs_max), obs_min)
-  bin_indices = []
-  for i in range(obs_size):
-    bin_indices.append(np.digitize(obs_capped[i], bins[i]))
+  def obs_to_bin(self, obs):
+    obs_capped = np.maximum(np.minimum(obs, self.obs_max), self.obs_min)
+    bin_indices = []
+    for i in range(self.obs_size):
+      bin_indices.append(np.digitize(obs_capped[i], self.bins[i]))
 
-  return tuple((np.asarray(bin_indices) - 1).astype(int))
+    return tuple((np.asarray(bin_indices) - 1).astype(int))
+
+class QAgent(object):
+
+  def __init__(self, num_actions, state_size, num_bins, gamma, learning_rate, env):
+
+    self.transformer = ObsTransformer(env, num_bins)
+    self.gamma = gamma
+    self.learning_rate = learning_rate
+    self.Q = np.zeros([int(num_bins),]*int(state_size) + [num_actions,])
+
+  def update(self, reward, old_state, old_action, new_state):
+
+    old_state_t = self.transformer.obs_to_bin(old_state)
+    new_state_t = self.transformer.obs_to_bin(new_state)
+    self.Q[old_state_t][old_action] += \
+      self.learning_rate*(reward + self.gamma*self.Q[new_state_t].max() - self.Q[old_state_t][old_action])
+
+  def predict(self, state):
+    state_t = self.transformer.obs_to_bin(state)
+    return np.argmax(self.Q[state_t])
 
 if __name__ == "__main__":
   env = gym.make("CartPole-v0")
-  old_obs = env.reset()
-  print(old_obs)
-
-  NUM_BINS = 10
-  INF_CAP = 2
-  LEARNING_RATE = 0.001
-  DISCOUNT = 0.9
-  GREEDY_VAL = 0.2
-
-  state_size = np.squeeze(env.observation_space.shape)
-  state_high = env.observation_space.high
-  state_low = env.observation_space.low
-  #state_high_capped = np.asarray([INF_CAP if h > INF_CAP else h for h in state_high])
-  #state_low_capped = np.asarray([-INF_CAP if l < -INF_CAP else l for l in state_low])
-  state_high_capped = np.asarray([2.4, 2, 0.4, 3.5])
-  state_low_capped = np.asarray([-2.4, -2, -0.4, -3.5])
-  bins = [np.linspace(l, h, NUM_BINS) for l, h in zip(state_low_capped, state_high_capped)]
-
-  print(state_high_capped, state_low_capped)
 
   num_actions = 0
   while env.action_space.contains(num_actions):
     num_actions += 1
 
-  print(env.action_space)
+  NUM_BINS = 10
+  INF_CAP = 2
+  LEARNING_RATE = 0.001
+  GAMMA = 0.9
+  GREEDY_VAL = 0.2
 
-  print(state_size, num_actions)
-  Q_shape = [NUM_BINS,]*int(state_size) + [num_actions,]
-  print([NUM_BINS,]*int(state_size))
-  print("Q_shape:", Q_shape)
-  Q = np.random.random_sample(Q_shape)
-  print("shape of Q:", Q.shape)
+  q_agent = QAgent(num_actions, env.observation_space.shape[0], NUM_BINS, GAMMA, LEARNING_RATE, env)
 
   run_times = []
   rewards = []
@@ -75,20 +72,21 @@ if __name__ == "__main__":
     done = False
     while i < 1000:
       epsilon = np.random.rand()
-      old_bin_obs = obs_to_bin(old_obs, state_low_capped, state_high_capped, state_size, bins)
+      #old_bin_obs = transformer.obs_to_bin(old_obs)
       if epsilon <= 1.0/np.sqrt(e + 1):
         old_action = env.action_space.sample()
       else:
         # Pick optimal value from Q-table
-        old_action = np.argmax(Q[old_bin_obs])
+        old_action = q_agent.predict(old_obs)
       new_obs, new_reward, done, _ = env.step(old_action)
       total_reward += new_reward
       if done and i < 199:
         new_reward = -300
-      new_bin_obs = obs_to_bin(new_obs, state_low_capped, state_high_capped, state_size, bins)#find_bin(new_obs)
-      q_old = Q[old_bin_obs][old_action]
-      q_new = Q[new_bin_obs]
-      Q[old_bin_obs][old_action] = (1 - LEARNING_RATE)*q_old + LEARNING_RATE*(new_reward + DISCOUNT*q_new.max())
+      #new_bin_obs = transformer.obs_to_bin(new_obs)#find_bin(new_obs)
+      #q_old = Q[old_bin_obs][old_action]
+      #q_new = Q[new_bin_obs]
+      #Q[old_bin_obs][old_action] = (1 - LEARNING_RATE)*q_old + LEARNING_RATE*(new_reward + DISCOUNT*q_new.max())
+      q_agent.update(new_reward, old_obs, old_action, new_obs)
       if done:
         if e % 100 == 0:
           print("reward:", total_reward)
@@ -102,8 +100,9 @@ if __name__ == "__main__":
   done = False
   old_obs = env.reset()
   while i < 1000:
-    old_bin_obs = obs_to_bin(old_obs, state_low_capped, state_high_capped, state_size, bins)#find_bin(old_obs)
-    action = np.argmax(Q[old_bin_obs])
+    #old_bin_obs = transformer.obs_to_bin(old_obs)#find_bin(old_obs)
+    #action = np.argmax(Q[old_bin_obs])
+    action = q_agent.predict(old_obs)
     old_obs, new_reward, done, _ = env.step(action)
     env.render()
     if done:
