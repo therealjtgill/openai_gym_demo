@@ -12,8 +12,6 @@ class ObsTransformer(object):
     self.num_bins = num_bins
     obs_max = env.observation_space.high
     obs_min = env.observation_space.low
-    #obs_max_capped = np.asarray([INF_CAP if h > INF_CAP else h for h in state_high])
-    #obs_min_capped = np.asarray([-INF_CAP if l < -INF_CAP else l for l in state_low])
     obs_max_capped = np.asarray([2.4, 2, 0.4, 3.5])
     obs_min_capped = np.asarray([-2.4, -2, -0.4, -3.5])
     self.obs_max = obs_max_capped
@@ -63,6 +61,7 @@ if __name__ == "__main__":
 
   q_agent = QAgent(num_actions, env.observation_space.shape[0], NUM_BINS, GAMMA, LEARNING_RATE, env)
 
+  # Train Q Agent
   run_times = []
   rewards = []
   for e in range(20000):
@@ -72,7 +71,6 @@ if __name__ == "__main__":
     done = False
     while i < 1000:
       epsilon = np.random.rand()
-      #old_bin_obs = transformer.obs_to_bin(old_obs)
       if epsilon <= 1.0/np.sqrt(e + 1):
         old_action = env.action_space.sample()
       else:
@@ -82,10 +80,6 @@ if __name__ == "__main__":
       total_reward += new_reward
       if done and i < 199:
         new_reward = -300
-      #new_bin_obs = transformer.obs_to_bin(new_obs)#find_bin(new_obs)
-      #q_old = Q[old_bin_obs][old_action]
-      #q_new = Q[new_bin_obs]
-      #Q[old_bin_obs][old_action] = (1 - LEARNING_RATE)*q_old + LEARNING_RATE*(new_reward + DISCOUNT*q_new.max())
       q_agent.update(new_reward, old_obs, old_action, new_obs)
       if done:
         if e % 100 == 0:
@@ -97,17 +91,17 @@ if __name__ == "__main__":
       old_obs = new_obs
       i += 1
 
+  # Run Q Agent
   done = False
   old_obs = env.reset()
   while i < 1000:
-    #old_bin_obs = transformer.obs_to_bin(old_obs)#find_bin(old_obs)
-    #action = np.argmax(Q[old_bin_obs])
     action = q_agent.predict(old_obs)
     old_obs, new_reward, done, _ = env.step(action)
     env.render()
     if done:
       break
 
+  # Show some useful plots
   import matplotlib.pyplot as plt
   plt.hist(run_times, bins='auto')
   plt.show()
