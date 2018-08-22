@@ -12,6 +12,12 @@ pip install numpy
 
 * Jupyter Notebook
 
+```
+python -m pip install jupyter
+```
+
+Or if that doesn't work, go here: http://jupyter.org/install
+
 ### What you should do:
 
 1. Get started with `cartpole_exploration.ipynb`
