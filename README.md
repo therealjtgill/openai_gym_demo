@@ -6,6 +6,7 @@ OpenAI Gym Demo for Tucson Python Meetup
 ```
 pip install gym
 pip install numpy
+pip install matplotlib
 ```
 
 ### Things you'll also need:
