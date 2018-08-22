@@ -15,5 +15,5 @@ pip install numpy
 ### What you should do:
 
 1. Get started with `cartpole_exploration.ipynb`
-2. Finish `binned_q_agent.py`
+2. Finish `binned_q_agent.py` by following along `filling_out_q_agent.md`
 3. Check out other environments

@@ -12,8 +12,12 @@ class ObsTransformer(object):
     self.num_bins = num_bins
     obs_max = env.observation_space.high
     obs_min = env.observation_space.low
-    obs_max_capped = np.asarray([2.4, 2, 0.4, 3.5])
-    obs_min_capped = np.asarray([-2.4, -2, -0.4, -3.5])
+
+    # EDIT MEEEEE vvv
+    obs_max_capped = np.asarray([1.0, 1.0, 1.0, 1.0])
+    obs_min_capped = np.asarray([-1.0, -1.0, -1.0, -1.0])
+    # EDIT MEEEEE ^^^
+
     self.obs_max = obs_max_capped
     self.obs_min = obs_min_capped
     self.bins = [np.linspace(l, h, num_bins) for l, h in zip(obs_min_capped, obs_max_capped)]
@@ -39,8 +43,10 @@ class QAgent(object):
 
     old_state_t = self.transformer.obs_to_bin(old_state)
     new_state_t = self.transformer.obs_to_bin(new_state)
-    self.Q[old_state_t][old_action] += \
-      self.learning_rate*(reward + self.gamma*self.Q[new_state_t].max() - self.Q[old_state_t][old_action])
+
+    # EDIT MEEEEE vvv
+    self.Q[old_state_t][old_action] += reward
+    # EDIT MEEEEE ^^^
 
   def predict(self, state):
     state_t = self.transformer.obs_to_bin(state)
@@ -53,23 +59,31 @@ if __name__ == "__main__":
   while env.action_space.contains(num_actions):
     num_actions += 1
 
-  NUM_BINS = 10
-  INF_CAP = 2
+  # Given values
   LEARNING_RATE = 0.001
   GAMMA = 0.9
-  GREEDY_VAL = 0.2
+  MAX_TIMESTEPS = 250
+
+  # EDIT MEEEEE vvv
+  NUM_BINS = 4
+  NUM_EPISODES = 200
+  # EDIT MEEEEE ^^^
 
   q_agent = QAgent(num_actions, env.observation_space.shape[0], NUM_BINS, GAMMA, LEARNING_RATE, env)
 
-  # Train Q Agent
+  #################
+  # Train Q Agent #
+  #################
   run_times = []
   rewards = []
-  for e in range(20000):
+  # Loop over some number of episodes
+  for e in range(NUM_EPISODES):
     old_obs = env.reset()
     total_reward = 0
     i = 0
     done = False
-    while i < 1000:
+    # Take steps in the environment
+    while i < MAX_TIMESTEPS:
       epsilon = np.random.rand()
       if epsilon <= 1.0/np.sqrt(e + 1):
         old_action = env.action_space.sample()
@@ -82,31 +96,37 @@ if __name__ == "__main__":
         new_reward = -300
       q_agent.update(new_reward, old_obs, old_action, new_obs)
       if done:
-        if e % 100 == 0:
-          print("reward:", total_reward)
-          print("num timesteps:", i)
+        if e % 10 == 0:
+          print("episode:", e)
+          print("  reward:", total_reward)
         run_times.append(i)
         rewards.append(total_reward)
         break
       old_obs = new_obs
       i += 1
 
-  # Run Q Agent
+  ###############
+  # Run Q Agent #
+  ###############
   done = False
   old_obs = env.reset()
-  while i < 1000:
+  while i < MAX_TIMESTEPS:
     action = q_agent.predict(old_obs)
     old_obs, new_reward, done, _ = env.step(action)
     env.render()
     if done:
       break
 
-  # Show some useful plots
+  ##########################
+  # Show some useful plots #
+  ##########################
   import matplotlib.pyplot as plt
   plt.hist(run_times, bins='auto')
+  plt.title("Histogram of cumulative rewards received")
   plt.show()
   smoothed_rewards = [sum(rewards[i:i+100])/100 for i in range(len(rewards))]
   plt.plot(smoothed_rewards)
+  plt.title("Smoothed cumulative rewards as a function of time")
   plt.show()
 
   env.close()
